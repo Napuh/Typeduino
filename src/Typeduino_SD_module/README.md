@@ -1,4 +1,5 @@
 # Typeduino SD Card dip switch module
+
 ## Building and pinout instructions
 In order to build this module, you need:
 - 1x Arduino-like ATMega32U4 microcontroller
@@ -50,3 +51,13 @@ If the device is not working properly there is a debug option you can activate i
 ```
 This will print all kind of useful information on the serial monitor to diagnose the what is going wrong.
 
+⚠️Warning⚠️
+If you use the debug option the device will not work properly in computers that do not have Arduino IDE installed and running. This is because the debug option uses the Arduino Serial Monitor to print the debug information, and if it does not detect a valid Serial Port open, Typeduino will keep waiting for one indefinitely. If you want to use the device in a computer that does not have Arduino IDE installed, you need to disable the debug mode
+
+## Different keyboard distributions
+
+With the Keyboard.h library, you can simulate a US keyboard distribution. 
+
+If you want to simulate a different keyboard distribution, you have to use another Keyboard library, because you may encounter errors executing keys like CTRL, ALT and alike. 
+
+In this repo a library for the spanish distribution is included in the lib folder. To use it you only have to import the zip archive into the Arduino IDE and select Keyboard_ES.h in line 19, commenting Keyboard.h in line 18. 
