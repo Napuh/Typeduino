@@ -8,10 +8,12 @@
 
 /* Use for debugging */
 #define debug
+
 /* Standard libraries */
 #include <SD.h>
 #include <SPI.h>
 #include <string.h>
+
 /* Keyboard dependent libraries */
 #include <Keyboard.h>
 //#include <Keyboard_ES.h>
@@ -26,8 +28,8 @@ int rMax = 100;
 /* Defining arduino pins */
 const int CSPinSDCard = 10;
 const int buttonPin = 2;
-// const int greenLEDPin = 19; WIP
-// const int redLEDPin = 18; WIP
+const int RXLED = 17;
+
 const int dipSwitch1Pin = 6;
 const int dipSwitch2Pin = 7;
 const int dipSwitch3Pin = 8;
@@ -67,49 +69,10 @@ String scriptName;
 #define KEYPAD_SLASH 220
 #define PRINTSCREEN 206
 
-/*
-void switchGreenLED()
+void showError()
 {
-  digitalWrite(greenLEDPin, !greenLEDStatus);
-  greenLEDStatus = !greenLEDStatus;
 }
 
-void turnOffGreenLED()
-{
-  digitalWrite(greenLEDPin, LOW);
-  greenLEDStatus = 0;
-}
-
-void showFatalErrorLED()
-{
-  while (1)
-  {
-    digitalWrite(redLEDPin, !redLEDStatus);
-    redLEDStatus = !redLEDStatus;
-    delay(50);
-  }
-}
-
-void showErrorLED()
-{
-  for (int y = 0; y < 10; ++y)
-  {
-    digitalWrite(redLEDPin, !redLEDStatus);
-    redLEDStatus = !redLEDStatus;
-    delay(100);
-  }
-}
-
-void turnOnLEDS(){
-  digitalWrite(redLEDPin, HIGH);
-  digitalWrite(greenLEDPin, HIGH);
-}
-
-void turnOffLEDS(){
-  digitalWrite(redLEDPin, LOW);
-  digitalWrite(greenLEDPin, LOW);
-}
-*/
 String getDipSwitchState()
 {
     String state;
@@ -153,6 +116,46 @@ String getDipSwitchState()
     return state;
 }
 
+void FatalError()
+{
+    while (1)
+    {
+        digitalWrite(RXLED, HIGH);
+        delay(50);
+        TXLED0;
+        delay(50);
+        digitalWrite(RXLED, LOW);
+        delay(50);
+        TXLED1;
+        delay(50);
+    }
+}
+
+void CommonError()
+{
+    for (int i = 0; i < 5; i++)
+    {
+        digitalWrite(RXLED, HIGH);
+        delay(200);
+        TXLED0;
+        delay(200);
+        digitalWrite(RXLED, LOW);
+        delay(200);
+        TXLED1;
+        delay(200);
+    }
+}
+
+void turnOnLEDS()
+{
+    digitalWrite(RXLED, HIGH);
+    TXLED1;
+}
+void turnOffLEDS()
+{
+    digitalWrite(RXLED, LOW);
+    TXLED0;
+}
 /*
   **************************************************************
   || The following functions are extracted from the           ||
@@ -384,15 +387,11 @@ void runCommand(int s, int e)
   -PIN 14: MISO Pin of SD card
   -PIN 15: SCK Pin of SD card
   -PIN 16: MOSI Pin of SD card
-  -PIN 18: Red LED Pin (A0)
-  -PIN 19: Green LED Pin (A1)
 */
 
 void setup()
 {
-    // pinMode(greenLEDPin, OUTPUT);
-    // pinMode(redLEDPin, OUTPUT);
-    // turnOnLEDS();
+    pinMode(RXLED, OUTPUT);
     pinMode(buttonPin, INPUT);
     pinMode(dipSwitch1Pin, INPUT_PULLUP);
     pinMode(dipSwitch2Pin, INPUT_PULLUP);
@@ -407,7 +406,6 @@ void setup()
     }
     Serial.println("Typeduino initialized");
 #endif
-    // turnOffLEDS();
 }
 
 void loop()
@@ -424,22 +422,27 @@ void loop()
 #endif
         if (!SD.begin(SPI_HALF_SPEED, CSPinSDCard))
         {
-            // showFatalErrorLED();
+
 #ifdef debug
             Serial.println("Error when openning SD Card");
 #endif
+            FatalError();
         }
 
         script = SD.open(scriptName);
         if (!script)
         {
-            // showErrorLED();
+            CommonError();
 #ifdef debug
             Serial.println("Error when openning script");
+            Serial.println("Script name: " + scriptName);
+            Serial.println("This error can be caused because the script");
+            Serial.println("does not exist, double check that");
 #endif
         }
         else
         {
+            turnOnLEDS();
             while (script.available())
             {
                 buf[bufSize] = script.read();
@@ -448,7 +451,6 @@ void loop()
                     if (buf[bufSize] == '\r' && script.peek() == '\n')
                         script.read();
 
-                    //---------REPEAT---------
                     int repeatBufferSize = 0;
                     int repeats = 0;
                     unsigned long payloadPosition = script.position();
@@ -476,8 +478,6 @@ void loop()
                         runLine();
 
                     script.seek(payloadPosition);
-                    //------------------------
-
                     runLine();
                     bufSize = 0;
                 }
@@ -491,8 +491,8 @@ void loop()
                 bufSize = 0;
             }
             script.close();
-            // turnOffGreenLED();
+            turnOffLEDS();
         }
     }
-    delay(200);
+    delay(100);
 }

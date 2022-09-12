@@ -49,3 +49,4 @@ If the device is not working properly there is a debug option you can activate i
 #define DEBUG true
 ```
 This will print all kind of useful information on the serial monitor to diagnose the what is going wrong.
+
