@@ -5,18 +5,22 @@
   ||  and the open source proyect Malduino from Seytonic.     ||
   ************************************************************||
 */
+#include <Arduino.h>
+#include <utils.h>
+#include <display_errors.h>
 
 /* Use for debugging ONLY */
-//#define debug
+#define debug
 
 /* Standard libraries */
+#include <Arduino.h>
 #include <SD.h>
 #include <SPI.h>
 #include <string.h>
 
 /* Keyboard dependent libraries */
 #include <Keyboard.h>
-//#include <Keyboard_ES.h>
+// #include <Keyboard_ES.h>
 
 /*
     IR library developed by NicoHood
@@ -34,22 +38,17 @@
 #define BUTTON6 0x40BFB04F
 
 /* Defining constants */
-const int buffersize = 256;
 int defaultDelay = 5;
 int defaultCharDelay = 5;
-int rMin = -100;
-int rMax = 100;
 
 /* Defining arduino pins */
 const int CSPinSDCard = 10;
-const int RXLED = 17;
 
 /* Defining IR variables */
 const int pinIR = 2;
 CHashIR IRLremote;
 
 /* Defining useful global variables */
-char *buf = malloc(sizeof(char) * buffersize);
 char *repeatBuffer = malloc(sizeof(char) * 12);
 int bufSize = 0;
 File script;
@@ -74,103 +73,22 @@ String scriptName;
 #define KEYPAD_SLASH 220
 #define PRINTSCREEN 206
 
-/* LED control functions */
-
-void FatalError()
-{
-    while (1)
-    {
-        digitalWrite(RXLED, HIGH);
-        delay(50);
-        TXLED0;
-        delay(50);
-        digitalWrite(RXLED, LOW);
-        delay(50);
-        TXLED1;
-        delay(50);
-    }
-}
-
-void CommonError()
-{
-    for (int i = 0; i < 5; i++)
-    {
-        digitalWrite(RXLED, HIGH);
-        delay(200);
-        TXLED0;
-        delay(200);
-        digitalWrite(RXLED, LOW);
-        delay(200);
-        TXLED1;
-        delay(200);
-    }
-}
-
-void turnOnLEDS()
-{
-    digitalWrite(RXLED, HIGH);
-    TXLED1;
-}
-void turnOffLEDS()
-{
-    digitalWrite(RXLED, LOW);
-    TXLED0;
-}
-
-/*
-  **************************************************************
-  || The following functions are extracted from the           ||
-  || open source repository www.github.com/seytonic/malduino  ||
-  || and fairly used according to the MIT license             ||
-  **************************************************************
-*/
-
-int getSpace(int start, int end)
-{
-    for (int i = start; i < end; i++)
-    {
-        if (buf[i] == ' ')
-            return i;
-    }
-    return -1;
-}
-
-bool equals(char *strA, int start, int end, char *strB, int strLen)
-{
-    if (end - start != strLen)
-        return false;
-    for (int i = 0; i < strLen; i++)
-    {
-        if (strA[start + i] != strB[i])
-            return false;
-    }
-    return true;
-}
-
-int toPositive(int num)
-{
-    if (num < 0)
-        return num * (-1);
-    else
-        return num;
-}
-
-bool equalsBuffer(int start, int end, char *str)
-{
-    return equals(buf, start, end, str, String(str).length());
-}
-
-int getInt(char *str, int pos)
-{
-    if (equals(str, pos + 1, pos + 7, "RANDOM", 6))
-    {
-        return random(rMin, rMax);
-    }
-    else
-    {
-        return String(str).substring(pos + 1, pos + 6).toInt();
-    }
-}
+/* Defining functions */
+void setup();
+void loop();
+String getDipSwitchState();
+void FatalError();
+void CommonError();
+void turnOnLEDS();
+void turnOffLEDS();
+int getSpace(int start, int end);
+bool equals(char *strA, int start, int end, char *strB, int strLen);
+int toPositive(int num);
+bool equalsBuffer(int start, int end, char *str);
+int getInt(char *str, int pos);
+void KeyboardWrite(uint8_t c);
+void runLine();
+void runCommand(int s, int e);
 
 void KeyboardWrite(uint8_t c)
 {
@@ -370,88 +288,96 @@ void loop()
         case BUTTON6:
             scriptName = "06";
             break;
+        default:
+            Serial.println("BUtton not identified");
+            break;
         }
-        scriptName += ".txt";
-#ifdef debug
-        Serial.println("executing script");
-#endif
-        if (!SD.begin(SPI_HALF_SPEED, CSPinSDCard))
-        {
 
-#ifdef debug
-            Serial.println("Error when openning SD Card");
-#endif
-            FatalError();
-        }
-        script = SD.open(scriptName);
-        if (!script)
+        if (scriptName != "")
         {
-            CommonError();
+            scriptName += ".txt";
 #ifdef debug
-            Serial.println("Error when openning script");
-            Serial.println("Script name: " + scriptName);
-            Serial.println("This error can be caused because the script");
-            Serial.println("does not exist, double check that");
+            Serial.println("executing script " + scriptName);
 #endif
-        }
-        else
-        {
-#ifdef debug
-            Serial.println("Sucess accessing script");
-#endif
-            turnOnLEDS();
-            while (script.available())
+            if (!SD.begin(SPI_HALF_SPEED, CSPinSDCard))
             {
-                buf[bufSize] = script.read();
-                if (buf[bufSize] == '\r' || buf[bufSize] == '\n' || bufSize >= buffersize)
+
+#ifdef debug
+                Serial.println("Error when openning SD Card");
+#endif
+                FatalError();
+            }
+            script = SD.open(scriptName);
+            if (!script)
+            {
+                CommonError();
+#ifdef debug
+                Serial.println("Error when openning script");
+                Serial.println("Script name: " + scriptName);
+                Serial.println("This error can be caused because the script");
+                Serial.println("does not exist, double check that");
+#endif
+            }
+            else
+            {
+#ifdef debug
+                Serial.println("Sucess accessing script");
+#endif
+                turnOnLEDS();
+                while (script.available())
                 {
-                    if (buf[bufSize] == '\r' && script.peek() == '\n')
-                        script.read();
-
-                    int repeatBufferSize = 0;
-                    int repeats = 0;
-                    unsigned long payloadPosition = script.position();
-
-                    for (int i = 0; i < 12; i++)
+                    buf[bufSize] = script.read();
+                    if (buf[bufSize] == '\r' || buf[bufSize] == '\n' || bufSize >= buffersize)
                     {
-                        if (script.available())
-                        {
-                            repeatBuffer[repeatBufferSize] = script.read();
-                            repeatBufferSize++;
-                        }
-                        else
-                            break;
-                    }
+                        if (buf[bufSize] == '\r' && script.peek() == '\n')
+                            script.read();
 
-                    if (repeatBufferSize > 6)
-                    {
-                        if (equals(repeatBuffer, 0, 6, "REPEAT", 6))
-                        {
-                            repeats = getInt(repeatBuffer, 6);
-                        }
-                    }
+                        int repeatBufferSize = 0;
+                        int repeats = 0;
+                        unsigned long payloadPosition = script.position();
 
-                    for (int i = 0; i < repeats; i++)
+                        for (int i = 0; i < 12; i++)
+                        {
+                            if (script.available())
+                            {
+                                repeatBuffer[repeatBufferSize] = script.read();
+                                repeatBufferSize++;
+                            }
+                            else
+                                break;
+                        }
+
+                        if (repeatBufferSize > 6)
+                        {
+                            if (equals(repeatBuffer, 0, 6, "REPEAT", 6))
+                            {
+                                repeats = getInt(repeatBuffer, 6);
+                            }
+                        }
+
+                        for (int i = 0; i < repeats; i++)
+                            runLine();
+
+                        script.seek(payloadPosition);
                         runLine();
+                        bufSize = 0;
+                    }
+                    else
+                        bufSize++;
+                }
 
-                    script.seek(payloadPosition);
+                if (bufSize > 0)
+                {
                     runLine();
                     bufSize = 0;
                 }
-                else
-                    bufSize++;
+                script.close();
+                turnOffLEDS();
             }
-
-            if (bufSize > 0)
-            {
-                runLine();
-                bufSize = 0;
-            }
-            script.close();
-            turnOffLEDS();
-        }
 #ifdef debug
-        Serial.println("Sucess executing script");
+            Serial.println("Sucess executing script");
 #endif
+            delay(200);
+        }
     }
 }

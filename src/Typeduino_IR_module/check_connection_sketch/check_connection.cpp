@@ -4,10 +4,12 @@
   ************************************************************
 */
 
+#include <Arduino.h>
 #include "IRLremote.h"
 #include <SPI.h>
 #include <SD.h>
 #include <string.h>
+#include <Keyboard.h>
 
 Sd2Card card;
 SdVolume volume;

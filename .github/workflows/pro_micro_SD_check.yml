@@ -1,0 +1,28 @@
+name: pro_micro_SD_check_CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.platformio/.cache
+          key: ${{ runner.os }}-pio
+      - uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      - name: Install PlatformIO Core
+        run: pip install --upgrade platformio
+      - name: Check pio ci command
+        run: pio ci . -c platformio.ini -e pro_micro_SD_check --exclude=src/lib/Keyboard_ES --exclude=src/src/Typeduino_IR_module --exclude=src/src/Typeduino_SD_module/Typeduino_SD_module.cpp --exclude=src/test --lib=include
