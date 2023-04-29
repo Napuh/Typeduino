@@ -4,9 +4,11 @@
   ************************************************************||
 */
 
+#include <Arduino.h>
 #include <SPI.h>
 #include <SD.h>
 #include <string.h>
+#include <Keyboard.h>
 
 Sd2Card card;
 SdVolume volume;
@@ -133,3 +135,5 @@ void loop()
     }
 
     Serial.println("Current dip switch state is: " + state);
+    delay(1000);
+}
